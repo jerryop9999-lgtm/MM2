@@ -247,8 +247,13 @@ SubTitle.ZIndex = 111
 --========================================================
 -- TOGGLE CREATOR
 --========================================================
+local UpdateESP
+local RemoveESP
+local SetNoclip
+local ESP = {}
 
-local function MakeToggle(y, label, emoji)
+
+local function MakeToggle(y, label, emoji, callback)
     local Holder = Instance.new("Frame")
     Holder.Parent = Main
     Holder.Size = UDim2.new(1,-24,0,58)
@@ -343,8 +348,13 @@ local function MakeToggle(y, label, emoji)
         end
     end
 
-    Toggle.MouseButton1Click:Connect(function()
-        SetState(not on)
+    -- Use Activated so it works reliably with both mouse and mobile touch.
+    Toggle.Activated:Connect(function()
+        local newState = not on
+        SetState(newState)
+        if callback then
+            task.spawn(callback, newState)
+        end
     end)
 
     return Toggle, SetState
@@ -357,7 +367,17 @@ end
 local ESPToggle, SetESPVisual = MakeToggle(
     70,
     "ESP BOX Frame",
-    "👁️"
+    "👁️",
+    function(state)
+        ESP_ENABLED = state
+        if state then
+            UpdateESP()
+        else
+            for player in pairs(ESP) do
+                RemoveESP(player)
+            end
+        end
+    end
 )
 
 --========================================================
@@ -367,7 +387,11 @@ local ESPToggle, SetESPVisual = MakeToggle(
 local NoclipToggle, SetNoclipVisual = MakeToggle(
     138,
     "NOCLIP",
-    "🪽"
+    "🪽",
+    function(state)
+        NOCLIP_ENABLED = state
+        SetNoclip(state)
+    end
 )
 
 --========================================================
@@ -404,9 +428,7 @@ end
 -- ESP BOX
 --========================================================
 
-local ESP = {}
-
-local function RemoveESP(player)
+RemoveESP = function(player)
     local data = ESP[player]
     if not data then return end
 
@@ -475,7 +497,7 @@ local function CreateESP(player, role)
     }
 end
 
-local function UpdateESP()
+UpdateESP = function()
     if not ESP_ENABLED then
         for player in pairs(ESP) do
             RemoveESP(player)
@@ -507,28 +529,11 @@ local function UpdateESP()
     end
 end
 
-ESPToggle.MouseButton1Click:Connect(function()
-    if ESP_ENABLED then
-        -- OFF: immediately remove every ESP object.
-        ESP_ENABLED = false
-        SetESPVisual(false)
-
-        for player in pairs(ESP) do
-            RemoveESP(player)
-        end
-    else
-        -- ON: enable and rebuild ESP from the current round state.
-        ESP_ENABLED = true
-        SetESPVisual(true)
-        UpdateESP()
-    end
-end)
-
 --========================================================
 -- NOCLIP
 --========================================================
 
-local function SetNoclip(state)
+SetNoclip = function(state)
     local char = LP.Character
     if not char then return end
 
@@ -538,20 +543,6 @@ local function SetNoclip(state)
         end
     end
 end
-
-NoclipToggle.MouseButton1Click:Connect(function()
-    if NOCLIP_ENABLED then
-        -- OFF
-        NOCLIP_ENABLED = false
-        SetNoclipVisual(false)
-        SetNoclip(false)
-    else
-        -- ON
-        NOCLIP_ENABLED = true
-        SetNoclipVisual(true)
-        SetNoclip(true)
-    end
-end)
 
 RunService.Stepped:Connect(function()
     if NOCLIP_ENABLED then
@@ -604,7 +595,7 @@ end)
 -- FLOAT OPEN / CLOSE
 --========================================================
 
-Float.MouseButton1Click:Connect(function()
+Float.Activated:Connect(function()
     Main.Visible = not Main.Visible
 end)
 
